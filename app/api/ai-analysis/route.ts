@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -7,6 +6,15 @@ import { PrismaClient } from '@prisma/client'
 export const dynamic = 'force-dynamic'
 
 const prisma = new PrismaClient()
+
+// Tipagem para os gastos
+interface Expense {
+  amount: number
+  category?: {
+    name: string
+  } | null
+  date: Date
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +30,7 @@ export async function POST(req: NextRequest) {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 0, 23, 59, 59)
 
-    const expenses = await prisma.expense.findMany({
+    const expenses: Expense[] = await prisma.expense.findMany({
       where: {
         userId: session.user.id,
         date: {
@@ -38,7 +46,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (expenses?.length === 0) {
+    if (expenses.length === 0) {
       return NextResponse.json(
         { error: 'Nenhum gasto encontrado para este mês' },
         { status: 400 }
@@ -49,21 +57,21 @@ export async function POST(req: NextRequest) {
     const groupedExpenses: Record<string, { total: number; count: number }> = {}
     let totalAmount = 0
 
-    expenses.forEach((expense) => {
+    expenses.forEach((expense: Expense) => {
       const categoryName = expense?.category?.name || 'Sem categoria'
       if (!groupedExpenses[categoryName]) {
         groupedExpenses[categoryName] = { total: 0, count: 0 }
       }
-      groupedExpenses[categoryName].total += expense?.amount || 0
+      groupedExpenses[categoryName].total += expense.amount || 0
       groupedExpenses[categoryName].count += 1
-      totalAmount += expense?.amount || 0
+      totalAmount += expense.amount || 0
     })
 
     // Preparar dados para a IA
     const expensesSummary = Object.entries(groupedExpenses)
       .map(([category, data]) => {
-        const percentage = ((data?.total || 0) / totalAmount) * 100
-        return `- ${category}: R$ ${(data?.total || 0).toFixed(2)} (${percentage.toFixed(1)}% do total, ${data?.count} gastos)`
+        const percentage = ((data.total || 0) / totalAmount) * 100
+        return `- ${category}: R$ ${(data.total || 0).toFixed(2)} (${percentage.toFixed(1)}% do total, ${data.count} gastos)`
       })
       .join('\n')
 
@@ -71,7 +79,7 @@ export async function POST(req: NextRequest) {
 
 **Gastos do mês:**
 Total gasto: R$ ${totalAmount.toFixed(2)}
-Número de transações: ${expenses?.length || 0}
+Número de transações: ${expenses.length}
 
 **Divisão por categoria:**
 ${expensesSummary}
@@ -95,10 +103,7 @@ Forneça uma análise completa e útil em português brasileiro.`
       body: JSON.stringify({
         model: 'gpt-4.1-mini',
         messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
+          { role: 'user', content: prompt }
         ],
         stream: true,
         max_tokens: 1500,
@@ -112,7 +117,7 @@ Forneça uma análise completa e útil em português brasileiro.`
     // Criar stream para retornar ao cliente
     const stream = new ReadableStream({
       async start(controller) {
-        const reader = response?.body?.getReader()
+        const reader = response.body?.getReader()
         const decoder = new TextDecoder()
         const encoder = new TextEncoder()
 
