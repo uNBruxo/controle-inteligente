@@ -7,9 +7,10 @@ export const dynamic = 'force-dynamic'
 
 const prisma = new PrismaClient()
 
-// Tipagem para os gastos
+// Tipagem para gastos
 interface Expense {
   amount: number
+  description?: string
   category?: {
     name: string
   } | null
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     let totalAmount = 0
 
     expenses.forEach((expense: Expense) => {
-      const categoryName = expense?.category?.name || 'Sem categoria'
+      const categoryName = expense.category?.name || 'Sem categoria'
       if (!groupedExpenses[categoryName]) {
         groupedExpenses[categoryName] = { total: 0, count: 0 }
       }
@@ -93,7 +94,7 @@ ${expensesSummary}
 
 Forneça uma análise completa e útil em português brasileiro.`
 
-    // Chamar a API da OpenAI com streaming
+    // Chamar a API da IA com streaming
     const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -102,9 +103,7 @@ Forneça uma análise completa e útil em português brasileiro.`
       },
       body: JSON.stringify({
         model: 'gpt-4.1-mini',
-        messages: [
-          { role: 'user', content: prompt }
-        ],
+        messages: [{ role: 'user', content: prompt }],
         stream: true,
         max_tokens: 1500,
       }),
